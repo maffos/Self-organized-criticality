@@ -6,7 +6,7 @@ import numpy as np
 import os
 import pandas as pd
 import matplotlib.lines as mlines
-            
+
 def find_max_number_avalanches(alpha, offset, tau = 10, color = 'b', show_plot = True, random_state = 1):
 
     path = 'Data/sub1/2000s/%d'%random_state
@@ -250,11 +250,5 @@ def create_fig1_initial_conditions(path, random_states, offsets = None):
     plt.yscale('log')
     plt.xlabel('L')
     plt.ylabel('p(L)')
-    plt.show() 
-
-        
-if __name__ == '__main__':
-    path = '/home/matthias/Uni/WS2122/CSN/Project/Data/N300_2000s'
-    random_states = np.arange(2,11)
-    create_fig1_initial_conditions(path, random_states = random_states)
+    plt.show()
 
