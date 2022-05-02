@@ -4,6 +4,8 @@ import pandas as pd
 import os
 import testing
 import argparse
+from collections import Counter
+import seaborn as sns
 
 def build_and_run(duration = 10000*ms, N=300, alpha = 1.4, u = 0.2, tau = 10*ms, tau_d = 1*ms, nu = 10, I = 0.025, theta = 1, topology = 'fc', dt = 1*ms, discrete = True, initialisation = {'h': 'uniform', 'J': 'uniform'}, random_state = 1, event_driven = True, p = None, record_states = True, plot_results = True, filename = None):
 
@@ -18,7 +20,7 @@ def build_and_run(duration = 10000*ms, N=300, alpha = 1.4, u = 0.2, tau = 10*ms,
           
     G = NeuronGroup(N, eqs, threshold = 'h>=theta', reset = 'h -= theta', method = 'euler', dt = dt)
     
-    #initialise mebrane potentials
+    #initialise membrane potentials
     if initialisation['h'] == 'uniform':
         G.h = np.random.sample(size = N)
     elif initialisation['h'] == 'zeros':
@@ -114,34 +116,107 @@ def build_and_run(duration = 10000*ms, N=300, alpha = 1.4, u = 0.2, tau = 10*ms,
         df.to_csv(filename)
          
     return [neuron_state,synapse_state], spikes
+   
+#calculate the avalanche distribution from spike train data. Either passed as a saved csv file or as a brian2 spike monitor
+def avalanche_distribution(data = None, path = None, suffix = None, alpha = None, tau = 10, offset = 0, write_to_disk = False, show_plot = True, color = 'b'):
+
+    if data is None:
+        filename = os.path.join(path,suffix)
+        data = pd.read_csv(filename)
+        spike_times = np.sort(data.t)
+        intervalls = np.diff(spike_times[offset:])
+    else:
+        intervalls = np.diff(np.sort(data.t/ms))
+        
+    avalanche_sizes = Counter()
+    avalanche_lengths = Counter()
+    size = 1
+    length = 1
     
+    for i in range(len(intervalls)):
+        if intervalls[i] <= tau:
+            size += 1
+            length += np.rint(intervalls[i]/tau)
+        else:
+            avalanche_sizes.update([size])
+            avalanche_lengths.update([length])
+            size = 1
+            length = 1
+    avalanche_sizes.update([size])
+    avalanche_lengths.update([length])
+    
+    if show_plot:
+        L = np.array(list(avalanche_sizes.keys()))
+        P_L = np.array(list(avalanche_sizes.values()))/np.sum(list(avalanche_sizes.values()))
+        order = np.argsort(L)
+        sns.set_style("whitegrid")
+        sns.despine()
+        plt.plot(L[order], P_L[order], '--', c = color)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.xlabel('L')
+        plt.ylabel('P(L)')
+        plt.show()
+        
+    if write_to_disk:
+
+        if not os.path.exists(path):
+            os.makedirs(path)
+        outfile_seq_size = os.path.join(path, 'alpha{}_sequence.csv'.format(alpha))
+        outfile_seq_length = os.path.join(path, 'alpha{}_sequence_length.csv'.format(alpha))
+        outfile_dist_size = os.path.join(path, 'alpha{}_distribution.csv'.format(alpha))
+        outfile_dist_length = os.path.join(path, 'alpha{}_distribution_length.csv'.format(alpha))
+
+        #write the avalanche size sequence       
+        with open(outfile_seq_size, 'w') as f:
+            for elem in avalanche_sizes.elements():
+                f.write(str(elem) + '\n') 
+                
+        L = np.array(list(avalanche_sizes.keys()))
+        P_L = np.array(list(avalanche_sizes.values()))/np.sum(list(avalanche_sizes.values()))
+        size_df = pd.DataFrame({'L': L, 'P_L': P_L})
+        #write the distribution of avalanche sizes
+        size_df.to_csv(outfile_dist_size)
+                
+        #write the sequence of avalanche lengths
+        with open(outfile_seq_length, 'w') as f:
+            for elem in avalanche_lengths.elements():
+                f.write(str(elem) + '\n') 
+                
+        L = np.array(list(avalanche_lengths.keys()))
+        P_L = np.array(list(avalanche_lengths.values()))/np.sum(list(avalanche_lengths.values()))
+        length_df = pd.DataFrame({'L': L, 'P_L': P_L})
+        #write the distribution of avalanche lengths
+        length_df.to_csv(outfile_dist_length)
+        
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("alpha", help= "Specify the value for the critical parameter alpha.", type =float)
+    parser.add_argument("N", help = "Specify the number of Neurons in the network.", type = int)
     parser.add_argument("duration", help= "Specify the length of the duration in ms.", type =int)
-    parser.add_argument("-t", "--test", help="Run tests before simulation.",action="store_true")
-    parser.add_argument("-r", "--random", help = "Set the random state used in the Simulation", type = int)
     parser.add_argument("-s", "--save", help = "Set to save the data to disk.", action = "store_true")
-    parser.add_argument("-p", "--plot", help = "Set to plot raster plot.", action = "store_true")
+    parser.add_argument("-r", "--random", help = "Specify the random state", type = int)
+    parser.add_argument("-p", "--path", help = 'Specify the path were Data is stored', type = str)
     args = parser.parse_args()
 
-    if args.test:
-        testing.run_all_tests()
     if args.random:
         random_state = args.random
     else:
-        random_state = 1 
-        
-    duration = args.duration*ms
-    tau = 10*ms
+        random_state = 1
 
-    N = 300
-    path = 'Data/N237_%ds/%d'%(duration/ms/1000, random_state)
+    if args.path:
+        path = args.path
+    else:
+        path = 'Data/N%d_%ds'%(args.N, args.duration)
+    duration = args.duration*ms
+
     if args.save:
         filename = os.path.join(path, 'alpha{}.csv'.format(args.alpha))
     else:
         filename = None
         
-    statemonitors, spikemonitor = build_and_run(duration, N, alpha=args.alpha, random_state = random_state, initialisation = {'h': 'uniform', 'J':1}, tau=tau, dt = tau, plot_results = args.plot, record_states = False, filename = filename)
+    statemonitors, spikemonitor = build_and_run(duration, args.N, alpha=args.alpha, random_state = random_state, initialisation = {'h': 'uniform', 'J':1}, plot_results = False, record_states = False, filename = filename)
+    avalanche_distribution(spikemonitor,path, alpha = args.alpha, write_to_disk = True)
     
+

@@ -1,5 +1,5 @@
 from brian2 import *
-from model import build_and_run
+from main import build_and_run
 from numpy.testing import assert_equal, assert_almost_equal
 
 def test_external_input():
