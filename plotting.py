@@ -7,53 +7,6 @@ import os
 import pandas as pd
 import matplotlib.lines as mlines
 
-def find_max_number_avalanches(alpha, offset, tau = 10, color = 'b', show_plot = True, random_state = 1):
-
-    path = 'Data/sub1/2000s/%d'%random_state
-    filename = os.path.join(path, 'alpha{}.csv'.format(alpha))
-    data = pd.read_csv(filename)
-    spike_times = np.sort(data.t)
-    intervalls = np.diff(spike_times[offset:])
-    avalanche_sizes = Counter()
-    avalanche_lengths = Counter()
-    size = 1
-    length = 1
-    for i in range(len(intervalls)):
-        if intervalls[i] <= tau:
-            size += 1
-            length += np.rint(intervalls[i]/tau)
-        else:
-            avalanche_sizes.update([size])
-            avalanche_lengths.update([length])
-            size = 1
-            length = 1
-    avalanche_sizes.update([size])
-    avalanche_lengths.update([length])
-    
-    
-    if show_plot:
-        L = np.array(list(avalanche_sizes.keys()))
-        P_L = np.array(list(avalanche_sizes.values()))/np.sum(list(avalanche_sizes.values()))
-        order = np.argsort(L)
-        sns.set_style("whitegrid")
-        sns.despine()
-        plt.plot(L[order], P_L[order], '--', c = color)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel('L')
-        plt.ylabel('P(L)')
-        plt.show()
-    
-    if show_plot:
-        plt.plot(spike_times[:offset], data.i[:offset], '.k')
-        plt.show()
-        
-    max_num = np.sum(list(avalanche_sizes.values()))
-    print('Max Number of avalanches is ', max_num)
-    print('Offset is: ', offset)
-    
-    return max_num
-
 def avalanche_distribution(data = None, path = None, alpha = None, tau = 10, offset = 0, write_to_disk = False, show_plot = True, color = 'b'):
     
     if data is None:

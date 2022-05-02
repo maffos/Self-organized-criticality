@@ -2,6 +2,8 @@ from brian2 import *
 import numpy as np
 import pandas as pd
 import os
+import testing
+import argparse
 
 def build_and_run(duration = 10000*ms, N=300, alpha = 1.4, u = 0.2, tau = 10*ms, tau_d = 1*ms, nu = 10, I = 0.025, theta = 1, topology = 'fc', dt = 1*ms, discrete = True, initialisation = {'h': 'uniform', 'J': 'uniform'}, random_state = 1, event_driven = True, p = None, record_states = True, plot_results = True, filename = None):
 
@@ -113,5 +115,33 @@ def build_and_run(duration = 10000*ms, N=300, alpha = 1.4, u = 0.2, tau = 10*ms,
          
     return [neuron_state,synapse_state], spikes
     
+if __name__ == '__main__':
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("alpha", help= "Specify the value for the critical parameter alpha.", type =float)
+    parser.add_argument("duration", help= "Specify the length of the duration in ms.", type =int)
+    parser.add_argument("-t", "--test", help="Run tests before simulation.",action="store_true")
+    parser.add_argument("-r", "--random", help = "Set the random state used in the Simulation", type = int)
+    parser.add_argument("-s", "--save", help = "Set to save the data to disk.", action = "store_true")
+    parser.add_argument("-p", "--plot", help = "Set to plot raster plot.", action = "store_true")
+    args = parser.parse_args()
+
+    if args.test:
+        testing.run_all_tests()
+    if args.random:
+        random_state = args.random
+    else:
+        random_state = 1 
+        
+    duration = args.duration*ms
+    tau = 10*ms
+
+    N = 300
+    path = 'Data/N237_%ds/%d'%(duration/ms/1000, random_state)
+    if args.save:
+        filename = os.path.join(path, 'alpha{}.csv'.format(args.alpha))
+    else:
+        filename = None
+        
+    statemonitors, spikemonitor = build_and_run(duration, N, alpha=args.alpha, random_state = random_state, initialisation = {'h': 'uniform', 'J':1}, tau=tau, dt = tau, plot_results = args.plot, record_states = False, filename = filename)
     
