@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import os
 import testing
-import argparse
 from collections import Counter
 import seaborn as sns
 
@@ -189,34 +188,3 @@ def avalanche_distribution(data = None, path = None, suffix = None, alpha = None
         #write the distribution of avalanche lengths
         length_df.to_csv(outfile_dist_length)
         
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("alpha", help= "Specify the value for the critical parameter alpha.", type =float)
-    parser.add_argument("N", help = "Specify the number of Neurons in the network.", type = int)
-    parser.add_argument("duration", help= "Specify the length of the duration in ms.", type =int)
-    parser.add_argument("-s", "--save", help = "Set to save the data to disk.", action = "store_true")
-    parser.add_argument("-r", "--random", help = "Specify the random state", type = int)
-    parser.add_argument("-p", "--path", help = 'Specify the path were Data is stored', type = str)
-    args = parser.parse_args()
-
-    if args.random:
-        random_state = args.random
-    else:
-        random_state = 1
-
-    if args.path:
-        path = args.path
-    else:
-        path = 'Data/N%d_%ds'%(args.N, args.duration)
-    duration = args.duration*ms
-
-    if args.save:
-        filename = os.path.join(path, 'alpha{}.csv'.format(args.alpha))
-    else:
-        filename = None
-        
-    statemonitors, spikemonitor = build_and_run(duration, args.N, alpha=args.alpha, random_state = random_state, initialisation = {'h': 'uniform', 'J':1}, plot_results = False, record_states = False, filename = filename)
-    avalanche_distribution(spikemonitor,path, alpha = args.alpha, write_to_disk = True)
-    
-
