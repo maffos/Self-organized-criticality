@@ -25,12 +25,11 @@ if args.path:
     path = args.path
 else:
     path = 'Data/N%d_%ds'%(args.N, args.duration)
-duration = args.duration*ms
 
 if args.save:
     filename = os.path.join(path, 'alpha{}.csv'.format(args.alpha))
 else:
     filename = None
     
-statemonitors, spikemonitor = soc.build_and_run(duration, args.N, alpha=args.alpha, random_state = random_state, initialisation = {'h': 'uniform', 'J':1}, plot_results = False, record_states = False, filename = filename)
+statemonitors, spikemonitor = soc.build_and_run(args.duration, args.N, alpha=args.alpha, random_state = random_state, initialisation = {'h': 'uniform', 'J':1}, plot_results = False, record_states = False, filename = filename)
 soc.avalanche_distribution(spikemonitor,path, alpha = args.alpha, write_to_disk = True)

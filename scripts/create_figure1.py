@@ -1,3 +1,11 @@
+"""
+This script reproduces Figure 1 in Levina et al. (2007).
+
+References:
+    Levina, Anna, J. Michael Herrmann, and Theo Geisel. "Dynamical synapses causing self-organized criticality in neural networks." Nature physics 3.12 (2007): 857-860.
+"""
+
+
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -12,7 +20,7 @@ path = '../Data/N%d_%ds' % (N, duration/tau)
 
 #run the model for each value of alpha
 for alpha in alphas:
-        os.system("python ../main.py {} {} {} -p {}".format(alpha,N, duration, path))
+        os.system("python run_single_simulation.py {} {} {} -p {}".format(alpha,N, duration, path))
 
 for alpha in alphas:
 

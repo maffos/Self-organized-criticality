@@ -2,22 +2,78 @@ from brian2 import *
 import numpy as np
 import pandas as pd
 import os
-import testing
 from collections import Counter
 import seaborn as sns
 
-def build_and_run(duration = 10000*ms, N=300, alpha = 1.4, u = 0.2, tau = 10*ms, tau_d = 1*ms, nu = 10, I = 0.025, theta = 1, topology = 'fc', dt = 1*ms, discrete = True, initialisation = {'h': 'uniform', 'J': 'uniform'}, random_state = 1, event_driven = True, p = None, record_states = True, plot_results = True, filename = None):
+def build_and_run(duration = 10000*ms,
+                  N=300,
+                  alpha = 1.4,
+                  u = 0.2,
+                  tau = 10*ms,
+                  tau_d = 1*ms,
+                  nu = 10,
+                  I = 0.025,
+                  topology = 'fc',
+                  dt = 1*ms,
+                  discrete = True,
+                  initialisation = {'h': 'uniform', 'J': 'uniform'},
+                  random_state = 1,
+                  event_driven = True,
+                  p = None,
+                  record_states = False,
+                  plot_results = True,
+                  filename = None):
+
+    """
+    Main method. Constructs a model of self-organized-criticality according to the passed parameters and runs the simulation.
+
+    Args:
+        duration   (brian2 unit, int, float)   :   Length of the simulation
+        N  (int)   :   Number of Neurons in the Network.
+        alpha  (float) :   Value of the critical parameter.
+        u  (float) :   Fraction by which synaptic strenth gets reduced.
+        tau (brian2 unit, int, float)   :   Time scale of the driving stochastic process.
+        tau_d   (brian2 unit, int,float)    :   Synaptic timescale.
+        nu  (float) :   Parameter to determine the timescale of the dynamics of the synaptic strength.
+        I   (float) :   Magnitude of the external drive.
+        topology   (str, tuple)    :    Specifies the network topology either by a string or by a tuple containing an array of presynaptic indices in the first entry and an array of corresponding postsynaptic indices in the second entry.
+        dt  (brian2 unit, int, float)   :   The temporal resolution of the numeric solver.
+        discrete    (bool)  :   Select, whether temporal integration is done in a discrete way or continously.
+        initialisation  (dict): Dictionary of the form {'h': (string, numerical, array), 'J': (str, numerical, array)}. Initialises the membrane potentials and the synaptic strengths.
+        random_state    (int)   :   Choose the random state
+        event_driven    (bool)  :   If selected, brian2 will update the synaptic strengths only upon spiking event which saves computation.
+        p   (float) :   Probability under which a Synapse is constructed if 'random' is selected as topology.
+        record_states   (bool)  :   If selected, brian2 will record the membrane potential and synaptic strengths. This can get very memory intensive.
+        plot_results    (bool)  : If selected, a raster plot will be plotted after simulation as well as an exemplary neuron trace, if record_states is selected.
+        filename    (str)   :   If specified, the data of the brian2 spike monitor will get stored to the specified file.
+
+    Returns:
+        (neuron_state,synapse_state)    :   Tuple containing the brian2 monitors of the membrane potential and synaptic strengths. Only contain data if record_states is selected.
+        spikes  :   Spike Data collected in the Brian2.SpikeMonitor class.
+    """
 
     np.random.seed(random_state)
     start_scope()
-    
+    #define constants
+    THETA = 1
+    #if variables that require physical units have been passed as numerics, convert them to units.
+    def to_unit(variable, unit):
+        if isinstance(variable, (int, float)):
+            variable = variable * unit
+        return variable
+
+    duration = to_unit(duration, ms)
+    tau = to_unit(tau, ms)
+    tau_d = to_unit(tau_d, ms)
+    dt = to_unit(dt, ms)
+
     if discrete: #sets the timestep to tau which makes the model discrete
         dt = tau
 
     #All dynamics of the model are event-based e.g. spike-trigered or given by external drive. Thus we only need to specify the variable for the membrane potential but no further dynamics.
     eqs = "h:1"
           
-    G = NeuronGroup(N, eqs, threshold = 'h>=theta', reset = 'h -= theta', method = 'euler', dt = dt)
+    G = NeuronGroup(N, eqs, threshold = 'h>=THETA', reset = 'h -= THETA', method = 'euler', dt = dt)
     
     #initialise membrane potentials
     if initialisation['h'] == 'uniform':
@@ -41,8 +97,11 @@ def build_and_run(duration = 10000*ms, N=300, alpha = 1.4, u = 0.2, tau = 10*ms,
     tau_j = tau*nu*N
     J_max = alpha/u
     N_neurons = N #we have to rename N because the class Synapses uses this variable internally, too
-    #the dynamics of the synaptic strength J are implemented in the Synapse class as well as the spike triggered postsynaptic potential
-    #the decrement of the synaptic strength at spike time needs to be adjusted with a correction term, as the governing ODE as specified in the equation dJ/dt gets executed first. Thus we cannot simply write J-=u*J. As in this case J has already been updated.
+
+
+    #The dynamics of the synaptic strength J are implemented in the Synapse class as well as the spike triggered postsynaptic potential.
+    #The decrement of the synaptic strength at spike time needs to be adjusted with a correction term, as the governing ODE as specified in the equation dJ/dt gets executed first. Thus we cannot simply write J-=u*J. As in this case J has already been updated.
+
     if event_driven:
         eqs =  "dJ/dt = 1/tau_j*(alpha/u-J) : 1 (event-driven)"
     else:
@@ -114,10 +173,24 @@ def build_and_run(duration = 10000*ms, N=300, alpha = 1.4, u = 0.2, tau = 10*ms,
         df.head()
         df.to_csv(filename)
          
-    return [neuron_state,synapse_state], spikes
+    return (neuron_state,synapse_state), spikes
    
 #calculate the avalanche distribution from spike train data. Either passed as a saved csv file or as a brian2 spike monitor
-def avalanche_distribution(data = None, path = None, suffix = None, alpha = None, tau = 10, offset = 0, write_to_disk = False, show_plot = True, color = 'b'):
+def avalanche_distribution(data = None, path = None, suffix = None, alpha = None, tau = 10, offset = 0, write_to_disk = False, show_plot = True):
+
+    """
+    Calculates the avalanche distribution from spike train data, either passed as a brian2.SpikeMonitor or as specified in a file.
+
+    Args:
+    :param data: If None, a file name has to be passed, where the data is stored. Otherwise a Brian2 Spike Monitor.
+    :param path: Path where data is stored and will be written.
+    :param suffix: End of the file name that contains the data.
+    :param alpha:   Value of the critical parameter alpha
+    :param tau: Value of the temporal resolution. Used to bin the spike trains.
+    :param offset:  If specified, Avalanche counting will start at the specified offset.
+    :param write_to_disk:   If specified, values of the avalanche distribution will be written to disk.
+    :param show_plot:   If specified the distribution will be plotted.
+    """
 
     if data is None:
         filename = os.path.join(path,suffix)
@@ -150,7 +223,7 @@ def avalanche_distribution(data = None, path = None, suffix = None, alpha = None
         order = np.argsort(L)
         sns.set_style("whitegrid")
         sns.despine()
-        plt.plot(L[order], P_L[order], '--', c = color)
+        plt.plot(L[order], P_L[order], '--', c = 'b')
         plt.xscale('log')
         plt.yscale('log')
         plt.xlabel('L')
